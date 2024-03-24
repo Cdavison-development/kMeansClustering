@@ -42,43 +42,52 @@ def computeDistance(a,b):
 
 def initialSelection(x,k):
     
-        np.random.seed(10)
+        np.random.seed(1500)
         centroids = np.random.uniform(np.amin(x, axis = 0), np.amax(x, axis=0), 
                                   size = (k, x.shape[1]))
         #print(centroids)
         return centroids 
     
-
-def clustername(x,k):
+#def computeClusterRepresentatives():
     
+def assignClusterIds():
     data_points = FileConversion()
-    data_array = np.array(data_points)
     centroids = initialSelection(FileConversion(), 3)
+    data_array = np.array(data_points)
+    c_list = []
+    #data_list = data_points.values.tolist()
+    centroid_list = centroids.tolist()
+    for centroid in centroid_list:
+        dist = []
+        for data_point in data_array:
+            distance = computeDistance(np.array(data_point), np.array(centroid))
+            dist.append(distance)
+        
+        c_list.append(dist)
+            
+    df = pd.DataFrame(np.array(c_list)).transpose()
     
-    # Stores the centroid values, as they are updated, initialiased to zeros
-    data_array_old = np.zeros(data_array.shape)
-# Stores the centroid nearest to the point
-    clusters = np.zeros(len(x))
-# Stores the error at this stage, iteration runs till error becomes zero
-    error = computeDistance(data_array,data_array_old,None)
-    while error!=0:
-        # Assigning each point to its nearest cluster
-        for i in range(len(data_array)):
-            distances = computeDistance(x[i],centroids)
-            cluster = np.argmin(distances)
-            clusters[i] = cluster
-            # Old centroid values stored in c_old 
-            data_array_old = deepcopy(centroids)
-            # Finding the new mean of each cluster
-            for i in range(k):
-                points = [x[j] for j in range(len(x)) if clusters[j] == i]
-                centroids[i] = np.mean(points, axis=0)
-            error = computeDistance(centroids, data_array_old, None)
+    clusters = df.idxmin(axis=1)
+    return clusters
     
-    print(centroids)
-    print(clusters)
-    print(error)
+
+def computeClusterRepresentatives(x, cluster_ids):
+    # Ensure the cluster IDs are in the same order as the original data points
+   x['ClusterID'] = cluster_ids.values
+
+   # Group the data points by their assigned cluster and calculate the mean
+   new_centroids = x.groupby('ClusterID').mean()
+
+   print(new_centroids)
+   return new_centroids
+#def clustername(x,k):
     
+
+            
+computeClusterRepresentatives(FileConversion(),assignClusterIds())
+    
+ 
+#clustername(FileConversion(),100)    
     
     
     
