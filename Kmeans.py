@@ -1,11 +1,3 @@
-#specify the number k of clusters to assign
-#Randomly initialise k centroids
-#repeat
-  #expectation: assign each point to its closest centroid
-    #maximisation: compute the new centroid (mean) of each cluster
-#until the centroid positions do not change
-
-
 
 import csv
 import numpy as np
@@ -34,15 +26,17 @@ def FileConversion():
 
         df = pd.read_csv('converted_file.csv')
         numeric_data = df.iloc[:, 1:]
+        numeric_data.to_csv("numeric.csv")
         return numeric_data
         
+
 def computeDistance(a,b):
         dist = np.linalg.norm(a-b)
         return dist
 
 def initialSelection(x,k):
     
-        np.random.seed(1500)
+        np.random.seed(314159)
         centroids = np.random.uniform(np.amin(x, axis = 0), np.amax(x, axis=0), 
                                   size = (k, x.shape[1]))
         #print(centroids)
@@ -50,41 +44,74 @@ def initialSelection(x,k):
     
 #def computeClusterRepresentatives():
     
-def assignClusterIds():
-    data_points = FileConversion()
-    centroids = initialSelection(FileConversion(), 3)
-    data_array = np.array(data_points)
+def assignClusterIds(x,J):
+    #data_points = x
+    J = initialSelection(x, 3)
+    #print(centroids)
+    data_array = np.array(x)
+    print(len(x))
     c_list = []
-    #data_list = data_points.values.tolist()
-    centroid_list = centroids.tolist()
-    for centroid in centroid_list:
+    
+    for centroid in J:
         dist = []
         for data_point in data_array:
+
             distance = computeDistance(np.array(data_point), np.array(centroid))
             dist.append(distance)
         
         c_list.append(dist)
-            
+
     df = pd.DataFrame(np.array(c_list)).transpose()
+
+    clusters = df.idxmin(axis=1)  # This creates a new DataFrame with two columns: the index and the cluster IDs
     
-    clusters = df.idxmin(axis=1)
     return clusters
     
 
 def computeClusterRepresentatives(x, cluster_ids):
+   #print(cluster_ids.values)
     # Ensure the cluster IDs are in the same order as the original data points
-   x['ClusterID'] = cluster_ids.values
+   x_copy = x
+   x_copy['ClusterID'] = cluster_ids.values
+  
+   new_centroids = x_copy.groupby('ClusterID').mean()
+   
 
-   # Group the data points by their assigned cluster and calculate the mean
-   new_centroids = x.groupby('ClusterID').mean()
+   print((new_centroids))
+   centroids_array = new_centroids.values
+   return centroids_array
 
-   print(new_centroids)
-   return new_centroids
-#def clustername(x,k):
-    
 
+
+def clustername(x,k,maxIter):
+   centroids = initialSelection(x, k)
+
+   for i in range(maxIter):
+       C = assignClusterIds(x,centroids)
+       new_centroids = computeClusterRepresentatives(x, C)
+       #print(new_centroids)
+       centroids = new_centroids
+   #print(centroids)
+   return centroids
+       
+x = FileConversion()
+
+#computeClusterRepresentatives(x,assignClusterIds(x, initialSelection(x, 3)))
+ # Call FileConversion once and use 'data'
+clustername(x, 9, 9)  
+
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(10, 7))
+plt.scatter(x_pca[:, 0], x_pca[:, 1], c=cluster_ids, cmap='viridis', marker='o')
+plt.title("Cluster Visualization")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.colorbar(label='Cluster ID')
+plt.show()
+#clustername(FileConversion(), 8, 200)
             
-computeClusterRepresentatives(FileConversion(),assignClusterIds())
+#computeClusterRepresentatives(FileConversion(),assignClusterIds())
     
  
 #clustername(FileConversion(),100)    
@@ -148,7 +175,3 @@ def plot_silhouettee():
 
 
 """""
-
-
-
-
