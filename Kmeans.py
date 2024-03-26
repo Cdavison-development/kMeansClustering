@@ -1,4 +1,3 @@
-
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,10 +21,10 @@ def FileConversion():
             # Split the line into parts using space as the delimiter
                 parts = line.strip().split(' ')
                 csv_writer.writerow(parts)
-            #print(f"File converted and saved as '{output_file}'")
-
-        df = pd.read_csv('converted_file.csv')
+        df = pd.read_csv(output_file, header=None)
+        #df.columns = range(df.shape[1])
         numeric_data = df.iloc[:, 1:]
+        #print(numeric_data.head())
         numeric_data.to_csv("numeric.csv")
         return numeric_data
         
@@ -39,24 +38,23 @@ def initialSelection(x,k):
         np.random.seed(314159)
         centroids = np.random.uniform(np.amin(x, axis = 0), np.amax(x, axis=0), 
                                   size = (k, x.shape[1]))
-        #print(centroids)
+        x.to_csv("x.csv")
         return centroids 
     
-#def computeClusterRepresentatives():
+def assignClusterIds(x,centroids):
     
-def assignClusterIds(x,J):
-    #data_points = x
-    J = initialSelection(x, 3)
-    #print(centroids)
     data_array = np.array(x)
-    print(len(x))
+    
     c_list = []
     
-    for centroid in J:
+    for centroid in centroids:
         dist = []
+        #print(data_array.shape)
+        #print(centroids.shape)
         for data_point in data_array:
 
             distance = computeDistance(np.array(data_point), np.array(centroid))
+            
             dist.append(distance)
         
         c_list.append(dist)
@@ -71,14 +69,15 @@ def assignClusterIds(x,J):
 def computeClusterRepresentatives(x, cluster_ids):
    #print(cluster_ids.values)
     # Ensure the cluster IDs are in the same order as the original data points
-   x_copy = x
+   x_copy = x.copy()
    x_copy['ClusterID'] = cluster_ids.values
-  
+   
    new_centroids = x_copy.groupby('ClusterID').mean()
    
 
-   print((new_centroids))
+   #print((new_centroids))
    centroids_array = new_centroids.values
+   
    return centroids_array
 
 
@@ -89,89 +88,91 @@ def clustername(x,k,maxIter):
    for i in range(maxIter):
        C = assignClusterIds(x,centroids)
        new_centroids = computeClusterRepresentatives(x, C)
-       #print(new_centroids)
        centroids = new_centroids
-   #print(centroids)
+       #print(centroids)
+
    return centroids
        
 x = FileConversion()
-
+k = 3
+#initial_cluster = initialSelection(x, k)
 #computeClusterRepresentatives(x,assignClusterIds(x, initialSelection(x, 3)))
- # Call FileConversion once and use 'data'
-clustername(x, 9, 9)  
+clusters = clustername(x, k, 50)  
 
-import matplotlib.pyplot as plt
+def distanceMatrix(x):
+    # Compute the number of objects in the dataset
+    N = len(x)
+    
+    # Distance matrix
+    distMatrix = np.zeros((N, N))
+    # Compute pairwise distances between the objects
+    for i in range(N):
+        for j in range (N):
+            # Distance is symmetric, so compute the distances between i and j only once
+            if i < j:
+                distMatrix[i][j] = computeDistance(x.iloc[i], x.iloc[j])
+                distMatrix[j][i] = distMatrix[i][j]
+    #print(distMatrix)
+    return distMatrix
 
-plt.figure(figsize=(10, 7))
-plt.scatter(x_pca[:, 0], x_pca[:, 1], c=cluster_ids, cmap='viridis', marker='o')
-plt.title("Cluster Visualization")
-plt.xlabel("Principal Component 1")
-plt.ylabel("Principal Component 2")
-plt.colorbar(label='Cluster ID')
-plt.show()
-#clustername(FileConversion(), 8, 200)
+distanceMatrix(x)
+def silhouette_coefficient(clusters, distMatrix):
+    n =len(x)
+    #distances = np.zeros((n, len(clusters))
+
+    silhouette = [0 for i in range(n)]
+    a = [0 for i in range(n)]
+    b = [10000000000 for i in range(n)]
+    
+    for (i, obj) in enumerate(x):
+        for(cluster_id, cluster) in enumerate(clusters):
+            clusterSize= len(cluster)
+            if i in cluster:
+                if clusterSize > 1:
+                    a[i] = np.sum(distMatrix[i][cluster])/(clusterSize-1)
+                else:
+                    a[i] = 0
+            else:
+                tempb = np.sum(distMatrix[i][cluster])/(clusterSize)
+                if tempb < b[i]: 
+                    b[i] = tempb
+                
+    for i in range(n):
+        silhouette[i] = 0 if a[i] == 0 else (b[i]-a[i])/np.max([a[i], b[i]])
+    
+    return silhouette
             
-#computeClusterRepresentatives(FileConversion(),assignClusterIds())
-    
- 
-#clustername(FileConversion(),100)    
     
     
     
+silhouette_coefficient(clusters, distanceMatrix(x))    
     
     
-""""
-    data_points = FileConversion()
-    data_array = np.array(data_points)
-    centroids = initialSelection(FileConversion(), 3)
-    
-    print(type(centroids))
-    for _ in range(1,k):
-       dist = []
-       for i in range(len(data_array)):
-           point = data_array[i]
-           min_dist_with_cen = computeDistance(point, centroids[0])
-           if len(centroids) > 1:
-               for j in range(1,len(centroids)):
-                   dist_wrt_centroid_j = computeDistance(point, centroids[j]) 
-                   min_dist_with_cen = min(min_dist_with_cen, dist_wrt_centroid_j)
-                   
-           dist.append(min_dist_with_cen)
+"""             
+       distances = np.zeros((n, len(clusters)))
+
+       for (i, point) in enumerate(x):
+           for (j, center )in enumerate(clusters):
+               distances[i, j] = computeDistance(point, center)
        
-       dist = np.array(dist)
-       next_centroid = data_array[np.argmax(dist)]
-       
-       np.append(centroids, next_centroid)
-       
-       print(centroids)
-    return centroids
-        
-        
-        
-clustername(FileConversion(),100)
+       cluster_assignments = np.argmin(distances, axis=1)
+       print(cluster_assignments)
+       silhouette = []
 
-
-        
-        
-        
-def initialisation(x,k):
-
-def computeClusterRepresentatives(C):
-
-def assignClusterIds(x,k,Y):
+   silhouette_coefficient(clusters)
+   """
     
-def kMeans(x,k,maxIter):
-    initialisation(x,k)
-    for i in range(1, maxIter):
-        C = assignClusterIds(x,k,Y)
-        Y = computeClusterRepresentatives(C)
-
-
-    return clusters
     
-def ComputeSilhouettee():
     
-def plot_silhouettee():
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
-
-"""""
