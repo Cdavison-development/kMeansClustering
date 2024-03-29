@@ -14,7 +14,7 @@ class Synthetic_data:
             # Assuming 'data' is your original dataset as a 2D NumPy array
         min_values = initial_data.min(axis=0)  # Minimum values for each column/feature
         max_values = initial_data.max(axis=0)  # Maximum values for each column/feature
-        np.random.seed(314159)
+        np.random.seed(31)
         # Generate synthetic data
         synthetic_data = np.random.uniform(low=min_values, high=max_values, size=initial_data.shape)
         #print(type(synthetic_data))
@@ -28,17 +28,17 @@ class Synthetic_data:
 
 if __name__ == "__main__":
    
-    
     # Initialize the Kmeans class with the path to your dataset file
    kmeans_instance = Kmeans('dataset')
    #print(kmeans_instance.data)
    synthetic_data_instance = Synthetic_data(kmeans_instance.data)
+   #print(Synthetic_data(kmeans_instance.data))
    #print(synthetic_data_instance.synthetic_data)
    synthetic_data = synthetic_data_instance.generate_data(kmeans_instance.data)
    #print(synthetic_data)
    #print(type(synthetic_data))
    # Select the number of clusters (k) and the maximum number of iterations for the k-means algorithm
-   k = 5
+   k = 3
    max_iterations = 100
 
    # Perform the clustering with the specified number of clusters and iterations
@@ -56,9 +56,22 @@ if __name__ == "__main__":
    #print(f"Silhouette score for k={k}: {silhouette_score:.4f}")
 
    # Plot silhouette scores for a range of k values to find the optimal number of clusters
-   kmeans_instance.plot_silhouette(k_range=range(2, 10))  # Example range from 2 to 10
-   print(f"Silhouette score for k={k}: {silhouette_score:.4f}")
+   #kmeans_instance.plot_silhouette(synthetic_data,k_range=range(2, 10))  # Example range from 2 to 10
+   #print(f"Silhouette score for k={k}: {silhouette_score:.4f}")
+   silhouette_scores_kmeans = []
+   for k in range(2,10):
+       labels1 = kmeans_instance.clustername(synthetic_data, k, max_iterations)
+       score1 = kmeans_instance.compute_silhouette(synthetic_data, labels1)
 
+       print(f"Silhouette coefficient on synthetic dataset for k={k} with K-means: {score1:.4f}")
+
+       silhouette_scores_kmeans.append(score1)
+       
+   plt.plot(range(2, 10), silhouette_scores_kmeans, "-bo")
+   plt.xlabel('k')
+   plt.ylabel('Silhouette Coefficient')
+   plt.title('Silhouette Coefficient for K-means on synthetic Data')
+   plt.show()
 
     
     

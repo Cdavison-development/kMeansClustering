@@ -3,11 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 import pandas as pd
+from Kmeans import Kmeans
 
-
-
-
-class Kmeans:
+class BisectingKmeans:
     def __init__(self,input_file):
         self.data = self.FileConversion(input_file)
         
@@ -29,9 +27,9 @@ class Kmeans:
                 csv_writer.writerow(parts)
         df = pd.read_csv(output_file, header=None)
         #df.columns = range(df.shape[1])
-        numeric_data = df.iloc[:, 1:]
+        numeric_data = df.iloc[:, 1:].to_numpy()
         #print(numeric_data.head())
-        numeric_data.to_csv("numeric.csv")
+        #numeric_data.to_csv("numeric.csv")
         #print(numeric_data)
         return numeric_data
         
@@ -43,61 +41,39 @@ class Kmeans:
     def initialSelection(self,data,k):
         #print(data)
         np.random.seed(314159)
-        centroids = np.random.uniform(np.amin(data, axis = 0), np.amax(data, axis=0), 
-                                  size = (k, data.shape[1]))
+        print(type(data))
+        centroids = [data]
+        
         #print(len(centroids))
         return centroids 
-    
-    def assignClusterIds(self,data,centroids):
-    
-        data_array = np.array(data)
-    
-        c_list = []
-    
-        for centroid in centroids:
-            dist = []
-            #print(len(centroid))
-            
-            for data_point in data_array:
-                distance = self.computeDistance(np.array(data_point), np.array(centroid))
-            
-                dist.append(distance)
         
-            c_list.append(dist)
-
-        df = pd.DataFrame(np.array(c_list)).transpose()
-
-        clusters = df.idxmin(axis=1)  # This creates a new DataFrame with two columns: the index and the cluster IDs
-    
-        return clusters
-    
-
-    def computeClusterRepresentatives(self,data, cluster_ids):
-        #print(cluster_ids.values)
-        # Ensure the cluster IDs are in the same order as the original data points
-        data_copy = data.copy()
-        data_copy['ClusterID'] = cluster_ids.values
         
-        new_centroids = data_copy.groupby('ClusterID').mean()
-   
-
-       #print((new_centroids))
-        centroids_array = new_centroids.values
-   
-        return centroids_array
-
-
-
     def clustername(self,data,k,maxIter):
-       centroids = self.initialSelection(data, k)
-       #print(data)
-       for i in range(maxIter):
-           C = self.assignClusterIds(data,centroids)
-           new_centroids = self.computeClusterRepresentatives(data, C)
-           centroids = new_centroids
-           #print(centroids)
-       #print(centroids)
+       
+       clusters = [data]
+       #print(type(clusters[0]))
+       while len(clusters) < k:
+           max_sse = -1 
+           max_sse_idx = 1
+           for i in range(len(clusters)):
+               sse = self.computeSumfSquare(clusters[i])
+               if sse > max_sse:
+                   max_sse = sse
+                   max_sse_idx = i
+                   
+           C = clusters[max_sse_idx]
+           
+           kmeans_instance = Kmeans('dataset')  # Adjust Kmeans initialization as needed
+           new_centroids = kmeans_instance.clustername(C, k, maxIter)
+           print(new_centroids)
+           #print(C)
+           
        return centroids
+
+    def computeSumfSquare(self,data):
+        centroid = np.mean(data, axis=0)
+        
+        return np.sum(np.square(data - centroid))
        
 
     def compute_silhouette(self,data, clusters):
@@ -169,51 +145,19 @@ class Kmeans:
         
     #x = FileConversion(self, 'dataset')
 if __name__ == '__main__':
-    kmeans_instance = Kmeans('dataset')
-    
-    k=3
-    maxIter = 100
-    centroids = kmeans_instance.clustername(kmeans_instance.data, k, maxIter)
-    
-    # Assign cluster IDs to each data point based on the final centroids
-    # This step is often integrated into the clustering process but is shown here for clarity
-    #cluster_ids = kmeans_instance.assignClusterIds(kmeans_instance.data, centroids)
+       bisectingKmeans_instance = BisectingKmeans('dataset')
+       
+       k=9
+       maxIter = 100
+       centroids = bisectingKmeans_instance.clustername(bisectingKmeans_instance.data, k, maxIter)
 
-    # Compute the silhouette score for the clustering
-    silhouette_score = kmeans_instance.compute_silhouette(kmeans_instance.data, centroids)
-    #print(f"Silhouette score for k={k}: {silhouette_score:.4f}")
+       # Assign cluster IDs to each data point based on the final centroids
+       # This step is often integrated into the clustering process but is shown here for clarity
+       #cluster_ids = bisectingKmeans_instance.assignClusterIds(bisectingKmeans_instance.data, centroids)
 
-    # Plot silhouette scores for a range of k values to find the optimal number of clusters
-    kmeans_instance.plot_silhouette(k_range=range(2, 10))  # Example range from 2 to 10
+       # Compute the silhouette score for the clustering
+       silhouette_score = bisectingKmeans_instance.compute_silhouette(bisectingKmeans_instance.data, centroids)
+       #print(f"Silhouette score for k={k}: {silhouette_score:.4f}")
 
-
-"""
-def compute_silhouette(x, clusters):
-    n =len(x)
-    
-    x_array = np.array(x)
-    
-    distances = np.zeros((n, len(clusters)))
-    for (i, point) in enumerate(x_array):
-        for (j, center )in enumerate(clusters):
-            distances[i, j] = computeDistance(point, center)
-    
-    cluster_assignments = np.argmin(distances, axis=1)
-    print(cluster_assignments)
-    silhouette = []
-
-    for i in range(n):
-        cluster = cluster_assignments[i]
-        other_clusters = set(range(len(clusters))) - {cluster}
-        same_cluster_points = [j for j in range(n) if cluster_assignments[j] == cluster and i != j]
-        if not same_cluster_points:
-            silhouette.append(0)
-            continue
-        avg_same_cluster = np.mean([computeDistance(x_array[i], x_array[j]) for j in same_cluster_points])
-        avg_other_clusters = [np.mean([computeDistance(x_array[i], x_array[j]) for j in range(n) if cluster_assignments[j] == other_cluster]) for other_cluster in other_clusters]
-        min_avg_other_clusters = np.min(avg_other_clusters)
-        silhouette.append((min_avg_other_clusters - avg_same_cluster) / max(avg_same_cluster, min_avg_other_clusters))
-
-    #print(np.mean(silhouette))
-    return np.mean(silhouette)
-"""
+       # Plot silhouette scores for a range of k values to find the optimal number of clusters
+       bisectingKmeans_instance.plot_silhouette(k_range=range(2, 10))  # Example range from 2 to 10

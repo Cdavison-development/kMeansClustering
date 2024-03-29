@@ -5,9 +5,7 @@ import random
 import pandas as pd
 
 
-
-
-class Kmeans:
+class Kmeansplusplus:
     def __init__(self,input_file):
         self.data = self.FileConversion(input_file)
         
@@ -31,7 +29,7 @@ class Kmeans:
         #df.columns = range(df.shape[1])
         numeric_data = df.iloc[:, 1:]
         #print(numeric_data.head())
-        numeric_data.to_csv("numeric.csv")
+        #numeric_data.to_csv("numeric.csv")
         #print(numeric_data)
         return numeric_data
         
@@ -42,29 +40,97 @@ class Kmeans:
 
     def initialSelection(self,data,k):
         #print(data)
+        #print(k)
         np.random.seed(314159)
-        centroids = np.random.uniform(np.amin(data, axis = 0), np.amax(data, axis=0), 
-                                  size = (k, data.shape[1]))
-        #print(len(centroids))
-        return centroids 
+        datatest1 = data.to_numpy()
+        #initial_centroid = np.random.uniform(np.amin(data, axis = 0), np.amax(data, axis=0),
+         #                                    size=data.shape[1])
+        initial_centroid = np.random.uniform(np.amin(datatest1, axis = 0), np.amax(datatest1, axis=0),
+                                             size=datatest1.shape[1])
+        #print(len(initial_centroid))
+        centroids = [initial_centroid]
+        #print(centroids)
+        #print(initial_centroid)
+        #centroids = np.zeros((k, data.shape[1]))
+   
+        for i in range(k-1):
+            #print("before")
+            distances = np.array([min(np.sum((x - c) ** 2) for c in centroids) for x in datatest1])
+            #print("after")
+            # Compute the probabilities for each point
+            probabilities = distances / np.sum(distances)
+            cumulative_probabilities = np.cumsum(probabilities)
+            
+            # Select the next centroid
+            r = random.uniform(0, 1)
+            #index = np.where(cumulative_probabilities >= r)[0][0]
+            #centroids.append(datatest1[index])
+            for j, p in enumerate(cumulative_probabilities):
+                if r < p:
+                    i = j
+                    break
+            centroids.append(datatest1[i])
+        #print(centroids)
+        centroids = np.array(centroids)
+        
+        #centroids.to_csv("centroids.csv")
+       # print(centroids)
+        return np.array(centroids)
+   
     
+        """
+        #print(type(initial_centroid))
+        data_array = np.array(data)
+        distances = []
+        for data_point in data_array:
+            distance = self.computeDistance((np.array(data_point), np.array(centroid_list)) ** 2)
+            distances.append(distance)
+            
+        #print(type(distances))
+        print(len(data))
+        #probabilities = []
+        distancesTotal = sum(distances)
+        for i in distances:
+            probability = distances / distancesTotal
+            cumulative_probability = probability.cumsum()
+            #print(cumulative_probability)
+            r = random.uniform(0, 1)
+            for j, p in enumerate(cumulative_probability):
+                if p > r:
+                    l = j
+                    print(p)
+                    break
+            centroid_list.append(data[l])
+        
+        centroid_list = np.array(centroid_list)   
+        
+        
+        return centroid_list 
+    """
     def assignClusterIds(self,data,centroids):
     
         data_array = np.array(data)
     
         c_list = []
-    
+        
+        #print("test")
         for centroid in centroids:
             dist = []
+            #print(np.array(centroid).shape)
             #print(len(centroid))
-            
+            #print(centroid)
             for data_point in data_array:
+                #if len(np.array(centroid)) != 300:
+                    
+                    #print(centroid)
+                #print(len(np.array(data_point)), len(np.array(centroid)))
                 distance = self.computeDistance(np.array(data_point), np.array(centroid))
-            
                 dist.append(distance)
+            
         
             c_list.append(dist)
-
+        
+        
         df = pd.DataFrame(np.array(c_list)).transpose()
 
         clusters = df.idxmin(axis=1)  # This creates a new DataFrame with two columns: the index and the cluster IDs
@@ -76,7 +142,7 @@ class Kmeans:
         #print(cluster_ids.values)
         # Ensure the cluster IDs are in the same order as the original data points
         data_copy = data.copy()
-        data_copy['ClusterID'] = cluster_ids.values
+        data_copy['ClusterID'] = cluster_ids.to_numpy()
         
         new_centroids = data_copy.groupby('ClusterID').mean()
    
@@ -141,7 +207,10 @@ class Kmeans:
                         b_i = min(b_i, other_cluster_avg)
         
         # Compute the silhouette score for point i
-            silhouette_scores.append((b_i - a_i) / max(a_i, b_i))
+            if max(a_i, b_i) > 0:
+                silhouette_scores.append((b_i - a_i) / max(a_i, b_i))
+            else:
+                silhouette_scores.append(0)
 
     # Returning the mean silhouette score
         score = np.mean(silhouette_scores)
@@ -164,27 +233,27 @@ class Kmeans:
         plt.plot(range(2, 10), silhouette_scores_kmeans, "-bo")
         plt.xlabel('k')
         plt.ylabel('Silhouette Coefficient')
-        plt.title('Silhouette Coefficient for K-meansy')
+        plt.title('Silhouette Coefficient for K-means ++')
         plt.show()
         
     #x = FileConversion(self, 'dataset')
 if __name__ == '__main__':
-    kmeans_instance = Kmeans('dataset')
+    kmeanspp_instance = Kmeansplusplus('dataset')
     
-    k=3
+    k=9
     maxIter = 100
-    centroids = kmeans_instance.clustername(kmeans_instance.data, k, maxIter)
-    
+    centroids = kmeanspp_instance.clustername(kmeanspp_instance.data, k, maxIter)
+
     # Assign cluster IDs to each data point based on the final centroids
     # This step is often integrated into the clustering process but is shown here for clarity
-    #cluster_ids = kmeans_instance.assignClusterIds(kmeans_instance.data, centroids)
+    cluster_ids = kmeanspp_instance.assignClusterIds(kmeanspp_instance.data, centroids)
 
     # Compute the silhouette score for the clustering
-    silhouette_score = kmeans_instance.compute_silhouette(kmeans_instance.data, centroids)
+    silhouette_score = kmeanspp_instance.compute_silhouette(kmeanspp_instance.data, centroids)
     #print(f"Silhouette score for k={k}: {silhouette_score:.4f}")
 
     # Plot silhouette scores for a range of k values to find the optimal number of clusters
-    kmeans_instance.plot_silhouette(k_range=range(2, 10))  # Example range from 2 to 10
+    kmeanspp_instance.plot_silhouette(k_range=range(2, 10))  # Example range from 2 to 10
 
 
 """
@@ -217,3 +286,4 @@ def compute_silhouette(x, clusters):
     #print(np.mean(silhouette))
     return np.mean(silhouette)
 """
+
