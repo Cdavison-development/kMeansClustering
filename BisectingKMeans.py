@@ -62,11 +62,15 @@ class BisectingKmeans:
                    max_sse_idx = i
                    
            C = clusters[max_sse_idx]
-           
-           kmeans_instance = Kmeans('dataset')  # Adjust Kmeans initialization as needed
-           new_centroids = kmeans_instance.clustername(C, k, maxIter)
-           print(new_centroids)
            #print(C)
+           kmeans_instance = Kmeans(C)
+          # C = clusters[max_sse_idx]# Adjust Kmeans initialization as needed
+           new_centroids, new_labels = kmeans_instance.clustername(2, maxIter)
+           print(new_labels)
+           #print(C)
+           #clusters.pop(max_sse_idx)
+           #clusters.append(C[new_labels == 0])
+           #clusters.append(C[new_labels == 1])
            
        return centroids
 

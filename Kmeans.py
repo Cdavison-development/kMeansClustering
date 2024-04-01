@@ -8,32 +8,16 @@ import pandas as pd
 
 
 class Kmeans:
-    def __init__(self,input_file):
-        self.data = self.FileConversion(input_file)
+    def __init__(self, data):
         
-    def FileConversion(self,input_file):
+        self.data = np.array(data)
+            
+    @staticmethod
+    def FileConversion(input_file):
         
-
-        # The path to your output CSV file
-        output_file = 'converted_file.csv'
-
-        # Open the input file in read mode and the output file in write mode
-        with open(input_file, 'r') as infile, open(output_file, 'w', newline='') as outfile:
-            # Create a CSV writer object for the output file
-            csv_writer = csv.writer(outfile)
-
-        # Read each line from the input file
-            for line in infile:
-            # Split the line into parts using space as the delimiter
-                parts = line.strip().split(' ')
-                csv_writer.writerow(parts)
-        df = pd.read_csv(output_file, header=None)
-        #df.columns = range(df.shape[1])
-        numeric_data = df.iloc[:, 1:]
-        #print(numeric_data.head())
-        numeric_data.to_csv("numeric.csv")
-        #print(numeric_data)
-        return numeric_data
+        df = pd.read_csv(input_file, header=None, sep="[\t ]+", engine='python')
+        df = df.iloc[:, 1:]  # Assuming you want to skip the first column
+        return df.to_numpy()
         
 
     def computeDistance(self,a,b):
@@ -43,118 +27,92 @@ class Kmeans:
     def initialSelection(self,data,k):
         #print(data)
         np.random.seed(314159)
-        centroids = np.random.uniform(np.amin(data, axis = 0), np.amax(data, axis=0), 
-                                  size = (k, data.shape[1]))
+        centroids = np.random.uniform(np.amin(self.data, axis = 0), np.amax(self.data, axis=0), 
+                                  size = (k, self.data.shape[1]))
         #print(len(centroids))
         return centroids 
     
     def assignClusterIds(self,data,centroids):
     
-        data_array = np.array(data)
+        data_array = np.array(self.data)
     
-        c_list = []
-    
-        for centroid in centroids:
+        #c_list = []
+        distance_matrix = []
+        # Iterate over each data point
+        for data_point in data_array:
             dist = []
-            #print(len(centroid))
-            
-            for data_point in data_array:
-                distance = self.computeDistance(np.array(data_point), np.array(centroid))
-            
+
+        # Calculate distance from this point to each centroid
+            for centroid in centroids:
+                distance = self.computeDistance(data_point, centroid)  # No need to convert to np.array here if they're already arrays
                 dist.append(distance)
+
+        # Add this point's distances to all centroids to the matrix
+            distance_matrix.append(dist)
+            
+    # Convert the list of lists into a NumPy array
+        distance_matrix = np.array(distance_matrix)
         
-            c_list.append(dist)
-
-        df = pd.DataFrame(np.array(c_list)).transpose()
-
-        clusters = df.idxmin(axis=1)  # This creates a new DataFrame with two columns: the index and the cluster IDs
-    
+    # Find the index of the minimum distance for each point
+        clusters = np.argmin(distance_matrix, axis=1)
+        #print(clusters)
         return clusters
     
 
     def computeClusterRepresentatives(self,data, cluster_ids):
-        #print(cluster_ids.values)
-        # Ensure the cluster IDs are in the same order as the original data points
-        data_copy = data.copy()
-        data_copy['ClusterID'] = cluster_ids.values
-        
-        new_centroids = data_copy.groupby('ClusterID').mean()
+        unique_clusters = np.unique(cluster_ids)
+        new_centroids = []
+
+        for cluster_id in unique_clusters:
+        # Get all data points assigned to the current cluster
+            cluster_points = self.data[cluster_ids == cluster_id]
+
+        # Calculate the mean position of these points
+            centroid = np.mean(cluster_points, axis=0)
+            new_centroids.append(centroid)
+
+    # Convert the list of new centroids into a NumPy array
+        new_centroids = np.array(new_centroids)
+
+        return new_centroids
    
 
-       #print((new_centroids))
-        centroids_array = new_centroids.values
-   
-        return centroids_array
 
 
-
-    def clustername(self,data,k,maxIter):
-       centroids = self.initialSelection(data, k)
+    def clustername(self,k,maxIter):
+       centroids = self.initialSelection(self.data, k)
        #print(data)
        for i in range(maxIter):
-           C = self.assignClusterIds(data,centroids)
-           new_centroids = self.computeClusterRepresentatives(data, C)
+           labels = self.assignClusterIds(self.data,centroids)
+           new_centroids = self.computeClusterRepresentatives(self.data, labels)
            centroids = new_centroids
            #print(centroids)
        #print(centroids)
-       return centroids
+       final_labels = self.assignClusterIds(self.data, centroids)
+       return centroids, final_labels
        
 
-    def compute_silhouette(self,data, clusters):
-        data = np.array(data)
-        #print(data)
-        n = len(data)
-        num_clusters = len(clusters)
-        
-        # Precompute all distances between data points and cluster centers
-        distances = np.array([[np.linalg.norm(data_point - cluster_center) for cluster_center in clusters] for data_point in data])
-        
-        # Determine the nearest cluster for each data point
-        nearest_clusters = np.argmin(distances, axis=1)
-        
-        silhouette_scores = []
-        for i in range(n):
-        # Identifying the cluster of the current point
-            own_cluster = nearest_clusters[i]
-        
-        # Calculating average distance from point i to other points in the same cluster
-            in_cluster_mask = (nearest_clusters == own_cluster) & (np.arange(n) != i)
-
-# Use the mask to select distances to the own cluster center for those points
-            if np.any(in_cluster_mask):
-                a_i = np.mean(distances[in_cluster_mask, own_cluster])
-            else:
-                a_i = 0  # Default to 0 if point i is the only member of its cluster
-        
-            point_distances = np.linalg.norm(data[i] - data, axis=1)
-        # Calculating the smallest average distance to all points in each other cluster
-            b_i = np.inf
-            for other_cluster in range(num_clusters):
-                if other_cluster != own_cluster:
-        # Create a mask for selecting data points in the other cluster
-                    other_cluster_mask = nearest_clusters == other_cluster
-        
-        # Use the mask to filter rows and then select the column corresponding to the other cluster's center
-                    if np.any(other_cluster_mask):
-                        other_cluster_distances = point_distances[other_cluster_mask]
-                        other_cluster_avg = np.mean(other_cluster_distances)
-                        b_i = min(b_i, other_cluster_avg)
-        
-        # Compute the silhouette score for point i
-            silhouette_scores.append((b_i - a_i) / max(a_i, b_i))
-
-    # Returning the mean silhouette score
-        score = np.mean(silhouette_scores)
-        return score
-
+    def compute_silhouette(self,labels):
+        if k==1:
+            silhouette_coefficient=0
+        else:
+            distances = np.sqrt(((data[:, np.newaxis, :] - data)**2).sum(axis=2))
+            s = np.zeros(len(data))
+            for i in range(len(data)):
+                a_i = np.mean(distances[i, labels == labels[i]])
+                b_i = np.min(np.mean(distances[i, labels != labels[i]]))
+                s[i] = (b_i - a_i) / max(a_i, b_i)
+            silhouette_coefficient = np.mean(s)
+        return silhouette_coefficient
+    
 
 
     
     def plot_silhouette(self,k_range=range(2,10)):
         silhouette_scores_kmeans = []
         for k in k_range:
-            labels1 = self.clustername(self.data, k, 100)
-            score1 = self.compute_silhouette(self.data, labels1)
+            _, labels1 = self.clustername(k, 100)
+            score1 = self.compute_silhouette(labels1)
 
             print(f"Silhouette coefficient for k={k} with K-means: {score1:.4f}")
 
@@ -169,18 +127,19 @@ class Kmeans:
         
     #x = FileConversion(self, 'dataset')
 if __name__ == '__main__':
-    kmeans_instance = Kmeans('dataset')
+    data = Kmeans.FileConversion('dataset')  # No need for 'self' here
+    kmeans_instance = Kmeans(data)
     
     k=3
     maxIter = 100
-    centroids = kmeans_instance.clustername(kmeans_instance.data, k, maxIter)
+    centroids, labels = kmeans_instance.clustername(k, maxIter)
     
     # Assign cluster IDs to each data point based on the final centroids
     # This step is often integrated into the clustering process but is shown here for clarity
     #cluster_ids = kmeans_instance.assignClusterIds(kmeans_instance.data, centroids)
 
     # Compute the silhouette score for the clustering
-    silhouette_score = kmeans_instance.compute_silhouette(kmeans_instance.data, centroids)
+    silhouette_score = kmeans_instance.compute_silhouette(labels)
     #print(f"Silhouette score for k={k}: {silhouette_score:.4f}")
 
     # Plot silhouette scores for a range of k values to find the optimal number of clusters
