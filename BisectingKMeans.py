@@ -1,3 +1,4 @@
+#import relevant libraries
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
@@ -5,33 +6,17 @@ import random
 import pandas as pd
 from Kmeans import Kmeans
 
+
 class BisectingKmeans:
     def __init__(self,input_file):
-        self.data = self.FileConversion(input_file)
+            self.data = input_file
+            
         
-    def FileConversion(self,input_file):
-        
-
-        # The path to your output CSV file
-        output_file = 'converted_file.csv'
-
-        # Open the input file in read mode and the output file in write mode
-        with open(input_file, 'r') as infile, open(output_file, 'w', newline='') as outfile:
-            # Create a CSV writer object for the output file
-            csv_writer = csv.writer(outfile)
-
-        # Read each line from the input file
-            for line in infile:
-            # Split the line into parts using space as the delimiter
-                parts = line.strip().split(' ')
-                csv_writer.writerow(parts)
-        df = pd.read_csv(output_file, header=None)
-        #df.columns = range(df.shape[1])
-        numeric_data = df.iloc[:, 1:].to_numpy()
-        #print(numeric_data.head())
-        #numeric_data.to_csv("numeric.csv")
-        #print(numeric_data)
-        return numeric_data
+    @staticmethod
+    def FileConversion(input_file):
+        df = pd.read_csv(input_file, header=None, sep="[\t ]+", engine='python')
+        df = df.iloc[:, 1:] 
+        return df.to_numpy()
         
 
     def computeDistance(self,a,b):
@@ -39,129 +24,103 @@ class BisectingKmeans:
         return dist
 
     def initialSelection(self,data,k):
-        #print(data)
         np.random.seed(314159)
-        print(type(data))
         centroids = [data]
-        
-        #print(len(centroids))
         return centroids 
         
         
     def clustername(self,data,k,maxIter):
+        clusters = [data]
        
-       clusters = [data]
-       #print(type(clusters[0]))
-       while len(clusters) < k:
-           max_sse = -1 
-           max_sse_idx = 1
-           for i in range(len(clusters)):
-               sse = self.computeSumfSquare(clusters[i])
-               if sse > max_sse:
-                   max_sse = sse
-                   max_sse_idx = i
-                   
-           C = clusters[max_sse_idx]
-           #print(C)
-           kmeans_instance = Kmeans(C)
-          # C = clusters[max_sse_idx]# Adjust Kmeans initialization as needed
-           new_centroids, new_labels = kmeans_instance.clustername(2, maxIter)
-           print(new_labels)
-           #print(C)
-           #clusters.pop(max_sse_idx)
-           #clusters.append(C[new_labels == 0])
-           #clusters.append(C[new_labels == 1])
-           
-       return centroids
+        
+        # Initialize a single cluster containing indices of all data points
+        clusters_indices = [np.arange(len(data))]
+
+        while len(clusters_indices) < k:
+        # Select the cluster to split based on maximum SSE
+            sse_list = [self.computeSumfSquare(data[indices]) for indices in clusters_indices]
+            idx_to_split = np.argmax(sse_list)
+            indices_to_split = clusters_indices.pop(idx_to_split)
+
+        # Perform K-means clustering with k=2 on the selected cluster
+            cluster_to_split = data[indices_to_split]
+            kmeans_instance = Kmeans(cluster_to_split)
+            _, labels = kmeans_instance.clustername(cluster_to_split, 2, maxIter)
+
+        # Split the indices based on labels and add them as new clusters
+            indices1 = indices_to_split[labels == 0]
+            indices2 = indices_to_split[labels == 1]
+            clusters_indices.append(indices1)
+            clusters_indices.append(indices2)
+
+        # Assign labels based on cluster indices
+        final_labels = np.empty(len(data), dtype=int)
+        for label, indices in enumerate(clusters_indices):
+            final_labels[indices] = label
+
+        # Calculate final centroids for each cluster
+        final_centroids = [np.mean(data[indices], axis=0) for indices in clusters_indices]
+
+        #print(np.array(final_centroids),final_labels)
+        return np.array(final_centroids), final_labels
 
     def computeSumfSquare(self,data):
         centroid = np.mean(data, axis=0)
-        
         return np.sum(np.square(data - centroid))
        
 
-    def compute_silhouette(self,data, clusters):
-        data = np.array(data)
-        #print(data)
-        n = len(data)
-        num_clusters = len(clusters)
-        
-        # Precompute all distances between data points and cluster centers
-        distances = np.array([[np.linalg.norm(data_point - cluster_center) for cluster_center in clusters] for data_point in data])
-        
-        # Determine the nearest cluster for each data point
-        nearest_clusters = np.argmin(distances, axis=1)
-        
-        silhouette_scores = []
-        for i in range(n):
-        # Identifying the cluster of the current point
-            own_cluster = nearest_clusters[i]
-        
-        # Calculating average distance from point i to other points in the same cluster
-            in_cluster_mask = (nearest_clusters == own_cluster) & (np.arange(n) != i)
+    def compute_silhouette(self,labels,k):
+       # print(labels.shape)
+        #print(type(labels[0]))
+        #print(k)
+        if k==1:
+            silhouette_coefficient=0
+        else:
+            distances = np.sqrt(((self.data[:, np.newaxis, :] - self.data[np.newaxis, :, :])**2).sum(axis=2))
 
-# Use the mask to select distances to the own cluster center for those points
-            if np.any(in_cluster_mask):
-                a_i = np.mean(distances[in_cluster_mask, own_cluster])
-            else:
-                a_i = 0  # Default to 0 if point i is the only member of its cluster
+            a = np.zeros(len(self.data))
+            b = np.inf * np.ones(len(self.data))
+            for i in range(len(self.data)):
+                a[i] = np.mean(distances[i, labels == labels[i]])
+                for cluster in set(labels):
+                    #print(labels)
+                    if cluster != labels[i]:
+                        cluster_mask = (labels == cluster)
+                        b[i] = min(b[i], np.mean(distances[i][cluster_mask]))
+               
+        s = (b - a) / np.maximum(a, b)
         
-            point_distances = np.linalg.norm(data[i] - data, axis=1)
-        # Calculating the smallest average distance to all points in each other cluster
-            b_i = np.inf
-            for other_cluster in range(num_clusters):
-                if other_cluster != own_cluster:
-        # Create a mask for selecting data points in the other cluster
-                    other_cluster_mask = nearest_clusters == other_cluster
+        silhouette_coefficient = np.mean(s)
         
-        # Use the mask to filter rows and then select the column corresponding to the other cluster's center
-                    if np.any(other_cluster_mask):
-                        other_cluster_distances = point_distances[other_cluster_mask]
-                        other_cluster_avg = np.mean(other_cluster_distances)
-                        b_i = min(b_i, other_cluster_avg)
-        
-        # Compute the silhouette score for point i
-            silhouette_scores.append((b_i - a_i) / max(a_i, b_i))
-
-    # Returning the mean silhouette score
-        score = np.mean(silhouette_scores)
-        return score
+        return silhouette_coefficient
 
 
 
     
-    def plot_silhouette(self,k_range=range(2,10)):
-        silhouette_scores_kmeans = []
-        for k in k_range:
-            labels1 = self.clustername(self.data, k, 100)
-            score1 = self.compute_silhouette(self.data, labels1)
-
-            print(f"Silhouette coefficient for k={k} with K-means: {score1:.4f}")
-
-            silhouette_scores_kmeans.append(score1)
-
-
-        plt.plot(range(2, 10), silhouette_scores_kmeans, "-bo")
+    @staticmethod
+    def plot_silhouette(k_range, silhouette_scores):
+        plt.plot(k_range, silhouette_scores, "-bo")
         plt.xlabel('k')
         plt.ylabel('Silhouette Coefficient')
-        plt.title('Silhouette Coefficient for K-meansy')
+        plt.title('Silhouette Coefficient for Bisecting K-means')
+        plt.xticks(list(k_range))  # Ensure ticks match k values
         plt.show()
         
     #x = FileConversion(self, 'dataset')
 if __name__ == '__main__':
-       bisectingKmeans_instance = BisectingKmeans('dataset')
-       
-       k=9
-       maxIter = 100
-       centroids = bisectingKmeans_instance.clustername(bisectingKmeans_instance.data, k, maxIter)
+       data = BisectingKmeans.FileConversion('dataset')  # Adjust path as needed
+       silhouette_scores = []
+       k_range = range(2, 11)  # Example range
 
-       # Assign cluster IDs to each data point based on the final centroids
-       # This step is often integrated into the clustering process but is shown here for clarity
-       #cluster_ids = bisectingKmeans_instance.assignClusterIds(bisectingKmeans_instance.data, centroids)
+       for k in k_range:
+            bisectingkmeans_instance = BisectingKmeans(data)
+            maxIter = 100
+            centroids, labels = bisectingkmeans_instance.clustername(data, k, maxIter)
 
-       # Compute the silhouette score for the clustering
-       silhouette_score = bisectingKmeans_instance.compute_silhouette(bisectingKmeans_instance.data, centroids)
-       #print(f"Silhouette score for k={k}: {silhouette_score:.4f}")
-
-       # Plot silhouette scores for a range of k values to find the optimal number of clusters
-       bisectingKmeans_instance.plot_silhouette(k_range=range(2, 10))  # Example range from 2 to 10
+        # Compute the silhouette score for the current k
+            silhouette_score = bisectingkmeans_instance.compute_silhouette(labels, k)
+            silhouette_scores.append(silhouette_score)
+            print(f"Silhouette score for k={k}: {silhouette_score:.4f}")
+            
+        # Plot silhouette scores for a range of k values to find the optimal number of clusters
+       BisectingKmeans.plot_silhouette(k_range,silhouette_scores)  # Example range from 2 to 10
